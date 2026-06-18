@@ -8,7 +8,7 @@ import time
 # ==========================================
 # CONFIGURATION
 # ==========================================
-genai.configure(api_key="ur api key") 
+genai.configure(api_key="ur api key here")  
 
 st.set_page_config(page_title="Roulette Split", page_icon="💸", layout="centered")
 st.title("💸 Roulette Split & Tracker")
