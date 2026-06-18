@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💸 Roulette Split</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom toggle button styling */
+        .friend-toggle.active { background-color: #4f46e5; border-color: #4f46e5; color: white; }
+        .friend-toggle { background-color: #1f2937; border-color: #374151; color: #9ca3af; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen font-sans antialiased pb-20">
+    
+    <div class="max-w-md mx-auto p-4 pt-8">
+        <h1 class="text-3xl font-bold text-center mb-2">💸 Roulette Split</h1>
+        <p class="text-center text-gray-400 mb-8">Scan your bill, claim your food, spin the wheel.</p>
+<p class="text-center text-gray-400 mb-6">Scan your bill, claim your food, spin the wheel.</p>
+
+        <div class="flex justify-center mb-8">
+            <a href="/dashboard/" class="bg-indigo-900/50 hover:bg-indigo-800 border border-indigo-500/50 text-indigo-300 text-sm font-bold py-2 px-6 rounded-full transition shadow-lg shadow-indigo-900/20">
+                📊 View Squad Leaderboard
+            </a>
+        </div>
+        <div class="bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+            <form method="POST" enctype="multipart/form-data" id="main-form" class="flex flex-col items-center">
+                {% csrf_token %}
+                <input type="file" name="receipt" id="receipt-input" accept="image/*" class="hidden" onchange="this.form.submit()">
+                
+                <div id="upload-ui" class="w-full flex gap-4">
+                    <button type="button" id="start-cam-btn" class="w-1/2 bg-indigo-600 hover:bg-indigo-500 rounded-lg p-6 text-center transition flex flex-col items-center justify-center">
+                        <span class="text-3xl mb-2">📷</span>
+                        <span class="text-sm font-bold">Live Camera</span>
+                    </button>
+                    <label for="receipt-input" class="w-1/2 cursor-pointer bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg p-6 text-center transition flex flex-col items-center justify-center">
+                        <span class="text-3xl mb-2">📁</span>
+                        <span class="text-sm font-bold">Upload File</span>
+                    </label>
+                </div>
+
+                <div id="camera-ui" class="hidden w-full flex flex-col items-center">
+                    <video id="camera-stream" class="w-full rounded-lg border-2 border-indigo-500 mb-4" autoplay playsinline></video>
+                    <button type="button" id="snap-btn" class="w-full bg-green-500 hover:bg-green-400 text-white font-bold py-3 rounded-lg shadow-lg">
+                        📸 SNAP & EXTRACT
+                    </button>
+                    <canvas id="camera-canvas" class="hidden"></canvas>
+                </div>
+            </form>
+        </div>
+
+        {% if data %}
+            {% if data.error %}
+                <div class="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-lg">
+                    <p><strong>Error:</strong> {{ data.error }}</p>
+                </div>
+            {% else %}
+                <div class="bg-gray-800 rounded-xl shadow-lg border border-indigo-500/30 overflow-hidden">
+                    <div class="p-6 bg-gray-800/50 border-b border-gray-700">
+                        <h2 class="text-xl font-bold text-indigo-400 mb-2">🏪 {{ data.store_name }}</h2>
+                        <div class="flex justify-between items-end">
+                            <span class="text-gray-400">Total Bill:</span>
+                            <span class="text-3xl font-black text-green-400">₹{{ data.total }}</span>
+                        </div>
+                    </div>
+
+                    <div id="step-1" class="p-6">
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Who is splitting? (comma separated)</label>
+                        <input type="text" id="friends-input" value="Nithish, Alice, Bob" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white mb-6 focus:outline-none focus:border-indigo-500">
+                        <button onclick="buildChecklist()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition">
+                            Next: Claim Items ➔
+                        </button>
+                    </div>
+
+                    <div id="step-2" class="hidden p-6">
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Claim Your Items</h3>
+                        <div id="items-container" class="space-y-4 mb-6 max-h-96 overflow-y-auto pr-2">
+                            </div>
+                        <button onclick="showRouletteSetup()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition">
+                            Confirm Claims ➔
+                        </button>
+                    </div>
+
+                    <div id="step-3" class="hidden p-6">
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Select the Penalty 😈</label>
+                        <select id="multiplier-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white mb-6">
+                            <option value="2">2x Their Share</option>
+                            <option value="3">3x Their Share</option>
+                            <option value="100">Fully (100% of Bill)</option>
+                        </select>
+                        <button onclick="playRoulette()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-black text-xl py-4 rounded-lg shadow-lg transition transform active:scale-95">
+                            🎰 SPIN THE WHEEL
+                        </button>
+                    </div>
+
+                    <div id="roulette-wheel" class="hidden text-center py-12">
+                        <p class="text-gray-400 mb-2">The wheel is spinning...</p>
+                        <h2 id="spinning-name" class="text-5xl font-black text-yellow-400 animate-pulse">???</h2>
+                    </div>
+
+                    <div id="results-screen" class="hidden p-6">
+                        <div class="bg-red-900/40 border border-red-500/50 rounded-lg p-4 mb-6 text-center">
+                            <h3 class="text-red-400 text-sm font-bold uppercase tracking-wider mb-1">The Loser is...</h3>
+                            <p id="loser-name" class="text-3xl font-black text-white"></p>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-3 font-medium">FINAL PAYOUTS</h4>
+                        <div id="payout-list" class="space-y-2 mb-6"></div>
+                        
+                        <button id="save-btn" onclick="saveToVault()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-lg shadow-lg transition">
+                            💾 Save to Vault
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <script>
+        const totalBill = parseFloat("{{ data.total|default:0 }}");
+        const receiptItems = [
+            {% for item in data.items %}
+            { name: "{{ item.name|escapejs }}", price: parseFloat("{{ item.price }}") },
+            {% endfor %}
+        ];
+    </script>
+
+    <script>
+        // --- 1. LIVE CAMERA LOGIC ---
+        const video = document.getElementById('camera-stream');
+        const canvas = document.getElementById('camera-canvas');
+        let stream = null;
+
+        document.getElementById('start-cam-btn')?.addEventListener('click', async () => {
+            document.getElementById('upload-ui').classList.add('hidden');
+            document.getElementById('camera-ui').classList.remove('hidden');
+            try {
+                // Request back camera if on mobile, default webcam on laptop
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("Camera access denied or unavailable.");
+                document.getElementById('upload-ui').classList.remove('hidden');
+                document.getElementById('camera-ui').classList.add('hidden');
+            }
+        });
+
+        document.getElementById('snap-btn')?.addEventListener('click', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            // Convert canvas to a File object and attach it to the hidden form input!
+            canvas.toBlob(blob => {
+                const file = new File([blob], "camera_snap.jpg", { type: "image/jpeg" });
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                document.getElementById('receipt-input').files = dt.files;
+                
+                // Turn off the webcam
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Submit to Django
+                document.getElementById('main-form').submit();
+            });
+        });
+
+        // --- 2. SMART CLAIMING LOGIC ---
+        // New global variables for the vault
+        let finalTabsGlobal = {};
+        let currentLoser = "";
+
+        let friends = [];
+        let itemClaims = {}; // { index: [array of names] }
+        let baseTabs = {}; 
+
+        function buildChecklist() {
+            const rawNames = document.getElementById('friends-input').value;
+            friends = rawNames.split(',').map(n => n.trim()).filter(n => n.length > 0);
+            
+            if (friends.length < 2) return alert("Need at least 2 people!");
+
+            const container = document.getElementById('items-container');
+            container.innerHTML = '';
+
+            receiptItems.forEach((item, index) => {
+                itemClaims[index] = []; // Start with nobody claiming it
+                
+                // Create Friend Toggles
+                let togglesHtml = friends.map(f => `
+                    <button onclick="toggleClaim(${index}, '${f}', this)" class="friend-toggle border text-xs font-bold py-1 px-2 rounded mt-2 mr-2 transition">
+                        ${f}
+                    </button>
+                `).join('');
+
+                container.innerHTML += `
+                    <div class="bg-gray-900 border border-gray-700 p-3 rounded-lg">
+                        <div class="flex justify-between items-start">
+                            <span class="text-sm text-gray-300 pr-2">${item.name}</span>
+                            <span class="text-sm font-bold text-white">₹${item.price.toFixed(2)}</span>
+                        </div>
+                        <div class="flex flex-wrap">${togglesHtml}</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('step-1').classList.add('hidden');
+            document.getElementById('step-2').classList.remove('hidden');
+        }
+
+        function toggleClaim(itemIndex, friendName, btnElement) {
+            const claims = itemClaims[itemIndex];
+            const nameIndex = claims.indexOf(friendName);
+            
+            if (nameIndex > -1) {
+                claims.splice(nameIndex, 1); // Remove claim
+                btnElement.classList.remove('active');
+            } else {
+                claims.push(friendName); // Add claim
+                btnElement.classList.add('active');
+            }
+        }
+
+        function showRouletteSetup() {
+            // Calculate base tabs based on what they clicked!
+            friends.forEach(f => baseTabs[f] = 0);
+            
+            let totalItemsPrice = 0;
+            
+            receiptItems.forEach((item, index) => {
+                totalItemsPrice += item.price;
+                const claimedBy = itemClaims[index];
+                if (claimedBy.length > 0) {
+                    const splitPrice = item.price / claimedBy.length;
+                    claimedBy.forEach(f => baseTabs[f] += splitPrice);
+                }
+            });
+
+            // Handle unlisted taxes/fees/tips (split evenly)
+            const taxAndFees = Math.max(0, totalBill - totalItemsPrice);
+            const taxSplit = taxAndFees / friends.length;
+            friends.forEach(f => baseTabs[f] += taxSplit);
+
+            document.getElementById('step-2').classList.add('hidden');
+            document.getElementById('step-3').classList.remove('hidden');
+        }
+
+        // --- 3. ROULETTE LOGIC ---
+        function playRoulette() {
+            const multiplier = parseInt(document.getElementById('multiplier-select').value);
+
+            document.getElementById('step-3').classList.add('hidden');
+            document.getElementById('roulette-wheel').classList.remove('hidden');
+
+            const spinningDisplay = document.getElementById('spinning-name');
+            let spinCount = 0;
+            
+            const spinInterval = setInterval(() => {
+                spinningDisplay.innerText = friends[Math.floor(Math.random() * friends.length)];
+                spinCount++;
+
+                if (spinCount > 25) {
+                    clearInterval(spinInterval);
+                    const loser = friends[Math.floor(Math.random() * friends.length)];
+                    spinningDisplay.innerText = loser;
+                    setTimeout(() => showFinalMath(loser, multiplier), 1000);
+                }
+            }, 100); 
+        }
+
+        function showFinalMath(loser, multiplier) {
+            document.getElementById('roulette-wheel').classList.add('hidden');
+            document.getElementById('results-screen').classList.remove('hidden');
+            document.getElementById('loser-name').innerText = `🎯 ${loser}`;
+            
+            let finalTabs = {};
+            let loserPenalty = 0;
+
+            if (multiplier === 100) {
+                // Fully pays the bill
+                friends.forEach(f => finalTabs[f] = 0);
+                finalTabs[loser] = totalBill;
+            } else {
+                // Penalty on THEIR specific base tab
+                loserPenalty = Math.min(baseTabs[loser] * multiplier, totalBill);
+                finalTabs[loser] = loserPenalty;
+                
+                // Calculate the "subsidy" (how much extra the loser is paying to reduce others' tabs)
+                const subsidyPool = loserPenalty - baseTabs[loser];
+                const discountPerPerson = subsidyPool / (friends.length - 1);
+
+                friends.forEach(f => {
+                    if (f !== loser) {
+                        finalTabs[f] = Math.max(0, baseTabs[f] - discountPerPerson);
+                    }
+                });
+            }
+
+            // Save results to globals so the fetch function can see them
+            finalTabsGlobal = finalTabs;
+            currentLoser = loser;
+
+            const listDiv = document.getElementById('payout-list');
+            listDiv.innerHTML = ''; 
+
+            friends.forEach(f => {
+                const isLoser = f === loser;
+                const baseText = multiplier !== 100 ? `<span class="text-xs text-gray-500 block">Base: ₹${baseTabs[f].toFixed(2)}</span>` : '';
+                
+                listDiv.innerHTML += `
+                    <div class="flex justify-between items-center bg-gray-900 p-3 rounded border border-gray-700">
+                        <div>
+                            <span class="${isLoser ? 'text-red-400 font-bold' : 'text-gray-300'}">
+                                ${isLoser ? '🚨 ' : '✅ '}${f}
+                            </span>
+                            ${baseText}
+                        </div>
+                        <span class="font-mono text-xl ${isLoser ? 'text-red-400 font-bold' : 'text-white'}">
+                            ₹${finalTabs[f].toFixed(2)}
+                        </span>
+                    </div>
+                `;
+            });
+        }
+
+        // --- 4. VAULT SAVE LOGIC ---
+        function saveToVault() {
+            const btn = document.getElementById('save-btn');
+            btn.innerText = "Saving to Database...";
+            btn.disabled = true;
+
+            const payload = {
+                store_name: "{{ data.store_name|escapejs }}",
+                total_amount: totalBill,
+                loser: currentLoser,
+                payouts: finalTabsGlobal
+            };
+
+            fetch('/save-split/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    btn.innerText = "✅ Saved Successfully!";
+                    btn.classList.replace('bg-green-600', 'bg-gray-700');
+                }
+            })
+            .catch(error => {
+                btn.innerText = "❌ Error Saving";
+                btn.classList.replace('bg-green-600', 'bg-red-600');
+            });
+        }
+    </script>
+</body>
+</html>
