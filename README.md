@@ -71,10 +71,3 @@ Nithish Ra
 
 ***
 
-### A Quick GitHub Pro-Tip
-Before you commit this README, it is highly recommended to quickly generate a `requirements.txt` file so anyone else who downloads your code knows exactly what Python packages to install. 
-
-Just run this single command in your terminal while your virtual environment is active:
-`pip freeze > requirements.txt`
-
-Then, you can run your `git add .`, `git commit -m "Added README and requirements"`, and `git push` to send the final polish to your live repository. You crushed this build!
